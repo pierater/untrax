@@ -3,6 +3,7 @@ import json
 from acoustid import fingerprint_file, lookup, parse_lookup_result
 from pprint import pprint
 import sys
+import unicodedata
 
 API_KEY = '1wAvr7OY' # acoustid unique key
 
@@ -44,8 +45,8 @@ def renameFiles(data, db, subdir, rootDir, file):
     try: # try to strip all whitespace and make sure encoding is of proper type
         title = title.strip() # to prevent linux ascii issues
         artist = artist.strip()
-        title = title.encode('utf-8')
-        artist = artist.encode('utf-8')
+        title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore')
+        artist = unicodedata.normalize('NFKD', artist).encode('ascii', 'ignore')
         artist = fixStrings(artist)
         title = fixStrings(title)
     except:
