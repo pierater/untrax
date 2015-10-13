@@ -4,8 +4,22 @@ from acoustid import fingerprint_file, lookup, parse_lookup_result
 from pprint import pprint
 import sys
 import unicodedata
+import pygn
 
 API_KEY = '1wAvr7OY' # acoustid unique key
+ID = '657923086-31EF11ADF7865240B0F637D95890D548'
+userID = '26553326526347855-467F6C10EA149D6F779D5368A6188C11'
+
+'''
+TODO:
+    Fix album_title getting
+    Use eyeD3 to edit id3 tags of each song
+    GUI
+'''
+
+
+
+
 
 def log(flag, artist = '', title = '', oldDir = '', newDir = ''):
 
@@ -18,6 +32,17 @@ def log(flag, artist = '', title = '', oldDir = '', newDir = ''):
     logFile = open('log.txt', 'a+')
     logFile.write(flag + "<" + artist + ">   <" + title + ">  < " + oldDir + ">   <" + newDir + ">\n")
     logFile.close()
+
+def getAlbum(artist, title):
+    '''
+    Uses pygn to get some missing metadata from another database
+    '''
+    data = pygn.search(ID, userID, artist, title)
+    try:
+        return data['album_title']
+    except:
+        log('ERRR===>', artist, title, 'Tried to get album')
+        return 'Failed'
 
 def fixStrings(string):
     '''
@@ -37,14 +62,23 @@ def renameFiles(data, db, subdir, rootDir, file):
     title = '' # initialize to empty string to prevent nonetype issues
     artist = '' # but they still sometimes get by
     ren = ''
+    album = ''
     if(db):
         ren = 'RENAMED' # Checks for the db flag and sets this to be appended to all file names
     for i in data: # data is a list of tuples, so must iterate through them
         title = i[2]
         artist = i[3]
+        '''
+    if(title == None):
+        return
+    if(artist == None):
+        return
+        '''
+    album = getAlbum(artist, title)
     try: # try to strip all whitespace and make sure encoding is of proper type
         title = title.strip() # to prevent linux ascii issues
         artist = artist.strip()
+        album = album.strip()
         title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore')
         artist = unicodedata.normalize('NFKD', artist).encode('ascii', 'ignore')
         artist = fixStrings(artist)
@@ -53,17 +87,16 @@ def renameFiles(data, db, subdir, rootDir, file):
         log('ERROR===>', 'Nonetype', 'err', subdir + '/' + str(file))
         return
 
-
-    if not os.path.exists(rootDir + artist): # check if artists path exists, then make it
-        os.mkdir(rootDir + artist)
-        log("SUCCESS", "Created directory", rootDir + artist)
+    if not os.path.exists(rootDir + artist + '/' +  album): # check if artists path exists, then make it
+        os.makedirs(rootDir + artist + '/' + album + '/')
+        log("SUCCESS", "Created directory", rootDir + artist + album)
 
     try:
         print subdir + '/' + file # just a thing to look at while running the code, should move to progessbar eventually
-        os.rename(subdir + '/' + file, rootDir + artist + '/' + title + ren + ".mp3")
+        os.rename(subdir + '/' + file, rootDir + artist + '/' + album + '/' + title + ren + ".mp3")
         log("SUCCESS", artist, title)
     except:
-        log("ERROR===>", artist, title, subdir + '/' + str(file), rootDir + artist + '/' + title)
+        log("ERROR===>", artist, title, subdir + '/' + str(file), rootDir + artist + '/' + album + '/' + title)
 
 
 def findSongs(rootDir, db = False, rm = False):
