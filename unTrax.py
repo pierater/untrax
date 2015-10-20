@@ -37,7 +37,7 @@ def getAlbum(artist, title):
     '''
     Uses pygn to get some missing metadata from another database
     '''
-    data = pygn.search(ID, userID, artist, title)
+    data = pygn.search(ID, userID, artist, '', title)
     try:
         return data['album_title']
     except:
@@ -74,6 +74,7 @@ def renameFiles(data, db, subdir, rootDir, file):
     if(artist == None):
         return
         '''
+    artist = artist.split(';')[0]
     album = getAlbum(artist, title)
     try: # try to strip all whitespace and make sure encoding is of proper type
         title = title.strip() # to prevent linux ascii issues
@@ -81,19 +82,23 @@ def renameFiles(data, db, subdir, rootDir, file):
         album = album.strip()
         title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore')
         artist = unicodedata.normalize('NFKD', artist).encode('ascii', 'ignore')
+        #print album
+        #album = unicodedata.normalize('NFKD', album).encode('ascii', 'ignore')
+        #print album
         artist = fixStrings(artist)
         title = fixStrings(title)
     except:
         log('ERROR===>', 'Nonetype', 'err', subdir + '/' + str(file))
         return
-
-    if not os.path.exists(rootDir + artist + '/' +  album): # check if artists path exists, then make it
-        os.makedirs(rootDir + artist + '/' + album + '/')
+    print album
+    print title
+    if not os.path.exists(rootDir + '/' + artist + '/' +  album + '/'): # check if artists path exists, then make it
+        os.makedirs(rootDir + '/' + artist + '/' + album + '/')
         log("SUCCESS", "Created directory", rootDir + artist + album)
 
     try:
         print subdir + '/' + file # just a thing to look at while running the code, should move to progessbar eventually
-        os.rename(subdir + '/' + file, rootDir + artist + '/' + album + '/' + title + ren + ".mp3")
+        os.rename(subdir + '/' + file, rootDir + '/' +  artist + '/' + album + '/' + title + ren + ".mp3")
         log("SUCCESS", artist, title)
     except:
         log("ERROR===>", artist, title, subdir + '/' + str(file), rootDir + artist + '/' + album + '/' + title)
@@ -147,9 +152,12 @@ if __name__ == "__main__":
     if '-h' in sys.argv:
         print "USAGE:\n     untrax [Music Dir] -[flags]"
         print
+        print
         print "-h: print options"
+        print
         print "-db: Will rename all files with appeneded 'RENAMED'"
-        print "-rm: Will remove any non .mp3 files"
+        print
+        print "-rm: Will remove any non .mp3 files and directories"
         exit()
 
     if len(sys.argv) == 1:
