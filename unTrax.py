@@ -5,6 +5,7 @@ from pprint import pprint
 import sys
 import unicodedata
 import pygn
+import eyed3
 
 API_KEY = '1wAvr7OY' # acoustid unique key
 ID = '657923086-31EF11ADF7865240B0F637D95890D548'
@@ -12,7 +13,6 @@ userID = '26553326526347855-467F6C10EA149D6F779D5368A6188C11'
 
 '''
 TODO:
-    Fix album_title getting
     Use eyeD3 to edit id3 tags of each song
     GUI
 '''
@@ -33,6 +33,35 @@ def log(flag, artist = '', title = '', oldDir = '', newDir = ''):
     logFile.write(flag + "<" + artist + ">   <" + title + ">  < " + oldDir + ">   <" + newDir + ">\n")
     logFile.close()
 
+
+def setTags(artist, album, title, track_num, path):
+    '''
+    uses eyed3 to change the id3 tags of a given song
+    '''
+    song = eyed3.load(path)
+    track_num = track_num.split(' ')[0]
+    if(track_num != ''):
+        song.tag.track_num = (unicode(str(track_num), 'utf-8'), None)
+    song.tag.artist = unicode(artist, 'utf-8')
+    song.tag.album = unicode(album, 'utf-8')
+    song.tag.album_artist = unicode(album, 'utf-8')
+    song.tag.title = unicode(title, 'utf-8')
+    song.tag.save()
+
+
+
+def getTrackNum(artist, title, album):
+    '''
+    Uses pygn to get track number for each song
+    '''
+    data = pygn.search(ID, userID, artist, album, title)
+    try:
+        return data['track_number']
+    except:
+        log('ERRR===>', artist, title, 'Tried to get track_number')
+        return 'Failed'
+        
+
 def getAlbum(artist, title):
     '''
     Uses pygn to get some missing metadata from another database
@@ -50,10 +79,12 @@ def fixStrings(string):
     if a new one is found, then it can be added here
     '''
     string = string.replace('/', '-')
+    string = string.strip()
+    string = unicodedata.normalize('NFKD', string).encode('ascii', 'ignore')
     return string
 
 
-def renameFiles(data, db, subdir, rootDir, file):
+def renameFiles(data, db, subdir, rootDir, file, t):
     '''
     This parses through the data from acoustid
     It will also attempt to rename each file accordingly
@@ -63,6 +94,7 @@ def renameFiles(data, db, subdir, rootDir, file):
     artist = '' # but they still sometimes get by
     ren = ''
     album = ''
+    track_num = ''
     if(db):
         ren = 'RENAMED' # Checks for the db flag and sets this to be appended to all file names
     for i in data: # data is a list of tuples, so must iterate through them
@@ -76,15 +108,10 @@ def renameFiles(data, db, subdir, rootDir, file):
         '''
     artist = artist.split(';')[0]
     album = getAlbum(artist, title)
+    if(t):
+        track_num = getTrackNum(artist, title, album)
+        track_num += ' - '
     try: # try to strip all whitespace and make sure encoding is of proper type
-        title = title.strip() # to prevent linux ascii issues
-        artist = artist.strip()
-        album = album.strip()
-        title = unicodedata.normalize('NFKD', title).encode('ascii', 'ignore')
-        artist = unicodedata.normalize('NFKD', artist).encode('ascii', 'ignore')
-        #print album
-        #album = unicodedata.normalize('NFKD', album).encode('ascii', 'ignore')
-        #print album
         artist = fixStrings(artist)
         title = fixStrings(title)
     except:
@@ -98,13 +125,15 @@ def renameFiles(data, db, subdir, rootDir, file):
 
     try:
         print subdir + '/' + file # just a thing to look at while running the code, should move to progessbar eventually
-        os.rename(subdir + '/' + file, rootDir + '/' +  artist + '/' + album + '/' + title + ren + ".mp3")
+        os.rename(subdir + '/' + file, rootDir + '/' +  artist + '/' + album + '/' + track_num + title + ren + ".mp3")
         log("SUCCESS", artist, title)
     except:
-        log("ERROR===>", artist, title, subdir + '/' + str(file), rootDir + artist + '/' + album + '/' + title)
+        log("ERROR===>", artist, title, subdir + '/' + str(file), rootDir + artist + '/' + album + '/' + track_num + '-' +  title)
+
+    setTags(artist, album, title, track_num, rootDir + '/' + artist + '/' + album + '/' + track_num + title + ren + '.mp3')
 
 
-def findSongs(rootDir, db = False, rm = False):
+def findSongs(rootDir, db = False, rm = False, t = False):
     '''
     Will go through every directory and file in rootDir
     For each file, it will be fingerprinted and changed
@@ -118,7 +147,7 @@ def findSongs(rootDir, db = False, rm = False):
                 duration, fingerprint = fingerprint_file(os.path.join(subdir, file)) # runs acoustid fingerprint algorithm
                 obj = lookup(API_KEY, fingerprint, duration) # gets json obj info from acoustid
                 data = parse_lookup_result(obj)
-                renameFiles(data, db, subdir, rootDir, file) # attempts to rename files before moving on to next file
+                renameFiles(data, db, subdir, rootDir, file, t) # attempts to rename files before moving on to next file
             else: # If it is not a mp3
                 if(rm): # checks rm flag
                     try:
@@ -148,6 +177,7 @@ if __name__ == "__main__":
     '''
     db = False
     rm = False
+    t = False
 
     if '-h' in sys.argv:
         print "USAGE:\n     untrax [Music Dir] -[flags]"
@@ -156,6 +186,8 @@ if __name__ == "__main__":
         print "-h: print options"
         print
         print "-db: Will rename all files with appeneded 'RENAMED'"
+        print
+        print "-t: Will append a track number to each song"
         print
         print "-rm: Will remove any non .mp3 files and directories"
         exit()
@@ -171,5 +203,7 @@ if __name__ == "__main__":
         db = True
     if '-rm' in sys.argv:
         rm = True
-    findSongs(rootDir, db, rm)
+    if '-t' in sys.argv:
+        t = True
+    findSongs(rootDir, db, rm, t)
 
