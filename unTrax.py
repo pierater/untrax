@@ -13,13 +13,32 @@ userID = '26553326526347855-467F6C10EA149D6F779D5368A6188C11'
 
 '''
 TODO:
-    Use eyeD3 to edit id3 tags of each song
     GUI
 '''
 
+def undo():
+    '''
+    Will read through the backup file and revert all names to old name
+    Does not fix directory tree
+    '''
+    for line in reversed(list(open("backup.txt"))):
+        if 'NEW BACKUP' in line:
+            break
+        line = line.rstrip()
+        oldDir, newDir, directory = line.split('|')
+        print "Reverting %sI back to %sII" % (directory + oldDir, newDir)
+        os.rename(newDir, directory + oldDir)
+    os.remove("backup.txt")
 
 
+def backup(oldDir, newDir, directory):
+    '''
+    Will write old directory and names to file in order to revert back to in the future
+    '''
 
+    back = open("backup.txt", 'a+')
+    back.write(oldDir + '|' + newDir + '|' + directory + '\n')
+    back.close()
 
 def log(flag, artist = '', title = '', oldDir = '', newDir = ''):
 
@@ -126,12 +145,15 @@ def renameFiles(data, db, subdir, rootDir, file, t):
     try:
         print subdir + '/' + file # just a thing to look at while running the code, should move to progessbar eventually
         os.rename(subdir + '/' + file, rootDir + '/' +  artist + '/' + album + '/' + track_num + title + ren + ".mp3")
+        backup(file, rootDir + '/' + artist + '/' + album + '/' + track_num + title + ren + '.mp3', rootDir + '/' + artist + '/' + album + '/')
         log("SUCCESS", artist, title)
     except:
         log("ERROR===>", artist, title, subdir + '/' + str(file), rootDir + artist + '/' + album + '/' + track_num + '-' +  title)
 
-    setTags(artist, album, title, track_num, rootDir + '/' + artist + '/' + album + '/' + track_num + title + ren + '.mp3')
-
+    try:
+        setTags(artist, album, title, track_num, rootDir + '/' + artist + '/' + album + '/' + track_num + title + ren + '.mp3')
+    except:
+        log("FAILED", "Permission denied", title)
 
 def findSongs(rootDir, db = False, rm = False, t = False):
     '''
@@ -190,8 +212,14 @@ if __name__ == "__main__":
         print "-t: Will append a track number to each song"
         print
         print "-rm: Will remove any non .mp3 files and directories"
+        print
+        print "-rev: Will revert all file names to their previous name"
+        print "NOTE-- This will only change back the NAME, not rework the directory structure"
         exit()
-
+    
+    if '-rev' in sys.argv:
+        undo()
+        exit()
     if len(sys.argv) == 1:
         print "You must include a music path!"
         print "Usage: 'untrax ~/Music/'"
@@ -205,5 +233,10 @@ if __name__ == "__main__":
         rm = True
     if '-t' in sys.argv:
         t = True
+
+    # This is so that the backup knows where to start
+    back = open("backup.txt", 'a+')
+    back.write("NEW BACKUP\n")
+    back.close()
     findSongs(rootDir, db, rm, t)
 
